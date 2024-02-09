@@ -8,11 +8,11 @@ import os
 
 import cv2
 import numpy as np
-import random
 
 import torch
 from torch.nn import functional as F
 from torch.utils import data
+import secrets
 
 class BaseDataset(data.Dataset):
     def __init__(self, 
@@ -67,8 +67,8 @@ class BaseDataset(data.Dataset):
                                 (self.ignore_label,))
         
         new_h, new_w = label.shape
-        x = random.randint(0, new_w - self.crop_size[1])
-        y = random.randint(0, new_h - self.crop_size[0])
+        x = secrets.SystemRandom().randint(0, new_w - self.crop_size[1])
+        y = secrets.SystemRandom().randint(0, new_h - self.crop_size[0])
         image = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]
         label = label[y:y+self.crop_size[0], x:x+self.crop_size[1]]
 
@@ -117,7 +117,7 @@ class BaseDataset(data.Dataset):
     def gen_sample(self, image, label, 
             multi_scale=True, is_flip=True, center_crop_test=False):
         if multi_scale:
-            rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
+            rand_scale = 0.5 + secrets.SystemRandom().randint(0, self.scale_factor) / 10.0
             image, label = self.multi_scale_aug(image, label, 
                                                     rand_scale=rand_scale)
 
