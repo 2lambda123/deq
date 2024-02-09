@@ -23,6 +23,23 @@ class BaseDataset(data.Dataset):
                  scale_factor=16,
                  mean=[0.485, 0.456, 0.406], 
                  std=[0.229, 0.224, 0.225]):
+        """This function initializes the parameters used for image processing.
+        Parameters:
+            - ignore_label (int): Label to be ignored during processing.
+            - base_size (int): Base size of the image.
+            - crop_size (tuple): Tuple of height and width for cropping the image.
+            - downsample_rate (int): Rate at which the image is downsampled.
+            - scale_factor (int): Factor by which the image is scaled.
+            - mean (list): List of mean values for normalizing the image.
+            - std (list): List of standard deviation values for normalizing the image.
+        Returns:
+            - None: This function does not return any value.
+        Processing Logic:
+            - Sets the base size, crop size, and ignore label for the image.
+            - Sets the mean and standard deviation values for normalizing the image.
+            - Sets the scale factor and downsample rate for processing the image.
+            - Creates an empty list for storing the image files."""
+        
 
         self.base_size = base_size
         self.crop_size = crop_size
@@ -36,9 +53,32 @@ class BaseDataset(data.Dataset):
         self.files = []
 
     def __len__(self):
+        """"Returns the length of the files attribute."
+        Parameters:
+            - self (object): The object whose files attribute will be evaluated.
+        Returns:
+            - int: The length of the files attribute.
+        Processing Logic:
+            - Returns the length of the files attribute.
+            - Uses the built-in len() function.
+            - Does not modify the object.
+            - Returns an integer value."""
+        
         return len(self.files)
     
     def input_transform(self, image):
+        """Transforms the input image by converting it to float32, inverting the color channels, normalizing it, and subtracting the mean and dividing by the standard deviation.
+        Parameters:
+            - image (numpy array): The input image to be transformed.
+        Returns:
+            - image (numpy array): The transformed image.
+        Processing Logic:
+            - Convert to float32.
+            - Invert color channels.
+            - Normalize.
+            - Subtract mean.
+            - Divide by standard deviation."""
+        
         image = image.astype(np.float32)[:, :, ::-1]
         image = image / 255.0
         image -= self.mean
@@ -46,9 +86,33 @@ class BaseDataset(data.Dataset):
         return image
     
     def label_transform(self, label):
+        """Transforms the label into an array of type int32.
+        Parameters:
+            - label (list): A list of labels to be transformed.
+        Returns:
+            - np.array: An array of type int32.
+        Processing Logic:
+            - Transform label into array.
+            - Cast array to type int32."""
+        
         return np.array(label).astype('int32')
 
     def pad_image(self, image, h, w, size, padvalue):
+        """Pads an image with a specified size and pad value.
+        Parameters:
+            - image (numpy array): The image to be padded.
+            - h (int): The height of the image.
+            - w (int): The width of the image.
+            - size (tuple): The desired size of the padded image in the format (height, width).
+            - padvalue (int): The value to be used for padding.
+        Returns:
+            - numpy array: The padded image.
+        Processing Logic:
+            - Copies the original image.
+            - Calculates the necessary padding for the image based on the desired size.
+            - If padding is needed, uses the cv2.copyMakeBorder function to add padding to the image.
+            - Returns the padded image."""
+        
         pad_image = image.copy()
         pad_h = max(size[0] - h, 0)
         pad_w = max(size[1] - w, 0)
@@ -60,6 +124,19 @@ class BaseDataset(data.Dataset):
         return pad_image
 
     def rand_crop(self, image, label):
+        """Docstring:
+        Crops the given image and label to the specified crop size.
+        Parameters:
+            - image (numpy array): The image to be cropped.
+            - label (numpy array): The label to be cropped.
+        Returns:
+            - image (numpy array): The cropped image.
+            - label (numpy array): The cropped label.
+        Processing Logic:
+            - Pad the image and label to the specified crop size.
+            - Generate random coordinates within the padded image.
+            - Crop the image and label using the generated coordinates."""
+        
         h, w = image.shape[:-1]
         image = self.pad_image(image, h, w, self.crop_size,
                                 (0.0, 0.0, 0.0))
@@ -75,6 +152,18 @@ class BaseDataset(data.Dataset):
         return image, label
 
     def center_crop(self, image, label):
+        """Crops the center of an image and its corresponding label to a specified size.
+        Parameters:
+            - image (numpy array): The image to be cropped.
+            - label (numpy array): The label corresponding to the image.
+        Returns:
+            - image (numpy array): The cropped image.
+            - label (numpy array): The cropped label.
+        Processing Logic:
+            - Calculate the center coordinates of the image.
+            - Crop the image and label using the calculated coordinates.
+            - Return the cropped image and label."""
+        
         h, w = image.shape[:2]
         x = int(round((w - self.crop_size[1]) / 2.))
         y = int(round((h - self.crop_size[0]) / 2.))
@@ -84,6 +173,20 @@ class BaseDataset(data.Dataset):
         return image, label
     
     def image_resize(self, image, long_size, label=None):
+        """Resizes an image to a specified long size while maintaining aspect ratio.
+        Parameters:
+            - image (numpy array): The image to be resized.
+            - long_size (int): The desired long size of the image.
+            - label (numpy array, optional): The label associated with the image. Defaults to None.
+        Returns:
+            - image (numpy array): The resized image.
+            - label (numpy array): The resized label, if applicable.
+        Processing Logic:
+            - Calculate new height and width based on the long size and original aspect ratio.
+            - Resize the image using the calculated dimensions and linear interpolation.
+            - If a label is provided, resize it using the same dimensions and nearest neighbor interpolation.
+            - If no label is provided, return only the resized image."""
+        
         h, w = image.shape[:2]
         if h > w:
             new_h = long_size
@@ -104,6 +207,21 @@ class BaseDataset(data.Dataset):
 
     def multi_scale_aug(self, image, label=None, 
             rand_scale=1, rand_crop=True):
+        """This function performs multi-scale augmentation on an image and its corresponding label, if provided.
+        Parameters:
+            - image (numpy array): The input image to be augmented.
+            - label (numpy array, optional): The corresponding label for the input image. Defaults to None.
+            - rand_scale (float, optional): The random scale factor to be applied to the base size. Defaults to 1.
+            - rand_crop (bool, optional): Whether to perform random cropping on the augmented image. Defaults to True.
+        Returns:
+            - image (numpy array): The augmented image.
+            - label (numpy array, optional): The augmented label, if provided.
+        Processing Logic:
+            - Calculates the long size of the image based on the base size and the random scale factor.
+            - If a label is provided, resizes both the image and label to the long size.
+            - If random cropping is enabled, performs random cropping on the augmented image and label.
+            - Returns the augmented image and label, if provided. Otherwise, returns only the augmented image."""
+        
         long_size = np.int(self.base_size * rand_scale + 0.5)
         if label is not None:
             image, label = self.image_resize(image, long_size, label)
@@ -116,6 +234,8 @@ class BaseDataset(data.Dataset):
 
     def gen_sample(self, image, label, 
             multi_scale=True, is_flip=True, center_crop_test=False):
+        """"""
+        
         if multi_scale:
             rand_scale = 0.5 + secrets.SystemRandom().randint(0, self.scale_factor) / 10.0
             image, label = self.multi_scale_aug(image, label, 
@@ -147,6 +267,8 @@ class BaseDataset(data.Dataset):
         return image, label
 
     def inference(self, model, image, flip=False):
+        """"""
+        
         size = image.size()
         pred, _, _ = model(x=image, train_step=-1)
         pred = F.upsample(input=pred, 
@@ -165,6 +287,8 @@ class BaseDataset(data.Dataset):
         return pred.exp()
 
     def multi_scale_inference(self, model, image, scales=[1], flip=False):
+        """"""
+        
         batch, _, ori_height, ori_width = image.size()
         assert batch == 1, "only supporting batchsize 1."
         device = torch.device("cuda:%d" % model.device_ids[0])

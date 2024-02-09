@@ -247,15 +247,56 @@ if args.adaptive:
 # Build the model
 ###############################################################################
 def init_weight(weight):
+    """Initializes the weight of a neural network layer with either a uniform or normal distribution.
+    Parameters:
+        - weight (tensor): The weight tensor to be initialized.
+        - init (str): The type of initialization to be used. Can be either 'uniform' or 'normal'.
+        - init_range (float): The range of values for the uniform distribution.
+        - init_std (float): The standard deviation for the normal distribution.
+    Returns:
+        - weight (tensor): The initialized weight tensor.
+    Processing Logic:
+        - Initializes the weight tensor based on the specified distribution.
+        - Uses the nn.init module from PyTorch.
+        - The uniform distribution is used by default if no initialization type is specified.
+        - The range for the uniform distribution is set to -1 to 1 by default.
+        - The standard deviation for the normal distribution is set to 0.0 by default.
+    Example:
+        weight = torch.zeros(3, 3)
+        init_weight(weight)
+        # weight is now initialized with the default uniform distribution (-1 to 1 range)"""
+    
     if args.init == 'uniform':
         nn.init.uniform_(weight, -args.init_range, args.init_range)
     elif args.init == 'normal':
         nn.init.normal_(weight, 0.0, args.init_std)
 
 def init_bias(bias):
+    """Sets the bias of a neural network layer to 0.
+    Parameters:
+        - bias (torch.Tensor): The bias tensor to be initialized.
+    Returns:
+        - None: The bias tensor is modified in-place.
+    Processing Logic:
+        - Set bias to 0.
+        - In-place modification.
+        - Use PyTorch's nn.init.constant_ function."""
+    
     nn.init.constant_(bias, 0.0)
 
 def weights_init(m):
+    """Weights_init function initializes the weights and biases of a neural network model.
+    Parameters:
+        - m (nn.Module): The neural network model to be initialized.
+    Returns:
+        - None: This function does not return any value.
+    Processing Logic:
+        - Checks the class name of the module and initializes the weights and biases accordingly.
+        - Uses init_weight and init_bias functions to initialize the weights and biases.
+        - For AdaptiveEmbedding and ProjectedAdaptiveLogSoftmax classes, also initializes the emb_projs and out_projs weights respectively.
+        - For LayerNorm class, initializes the weight with a normal distribution with mean 1.0 and standard deviation args.init_std.
+        - For WeightShareSelfAttention class, initializes the r_w_bias and r_r_bias weights."""
+    
     classname = m.__class__.__name__
     if classname.find('Linear') != -1 or classname.find('Conv1d') != -1:
         if hasattr(m, 'weight') and m.weight is not None:
@@ -291,6 +332,17 @@ def weights_init(m):
             init_weight(m.r_r_bias)
 
 def update_dropout(m):
+    """"Updates the dropout rate of a given module based on the specified value.
+    Parameters:
+        - m (module): The module to update the dropout rate for.
+    Returns:
+        - None: This function does not return any values.
+    Processing Logic:
+        - Find the classname of the module.
+        - Check if the module has a 'p' attribute.
+        - If it does, update the 'p' attribute with the specified dropout value.
+        - If it does not, update the 'dropout' attribute with the specified dropout value.""""
+    
     classname = m.__class__.__name__
     if classname.find('Dropout') != -1:
         if hasattr(m, 'p'):
@@ -299,6 +351,17 @@ def update_dropout(m):
             m.dropout = args.dropout
 
 def update_dropatt(m):
+    """Updates the dropout rate of the dropatt layer in the provided model.
+    Parameters:
+        - m (nn.Module): The model to update the dropatt layer in.
+    Returns:
+        - None: The function does not return anything.
+    Processing Logic:
+        - Check if the provided model has a dropatt layer.
+        - If the model has a dropatt layer, check if it has a 'p' attribute.
+        - If the 'p' attribute exists, update its value to the provided dropout rate.
+        - If the 'p' attribute does not exist, update the 'dropout' attribute to the provided dropout rate."""
+    
     if hasattr(m, 'dropatt'):
         if hasattr(m, 'p'):
             m.dropatt.p = args.dropatt
@@ -401,6 +464,20 @@ logging('=' * 100)
 ###############################################################################
 
 def evaluate(eval_iter):
+    """"Evaluates the performance of the model on the given evaluation data.
+    Parameters:
+        - eval_iter (iterator): An iterator that yields batches of evaluation data. Each batch should contain the data, target, and sequence length.
+    Returns:
+        - average_loss (float): The average loss over the evaluation data.
+    Processing Logic:
+        - Sets the model to evaluation mode.
+        - Resets the model's length to the specified evaluation target length and memory length.
+        - Evaluates the model on the evaluation data.
+        - Computes the average loss over the evaluation data.
+        - Sets the model back to training mode.
+    Example:
+        evaluate(eval_iter) # returns 0.0021""""
+    
     global train_step
     model.eval()
     model.reset_length(args.eval_tgt_len, args.mem_len)
@@ -431,6 +508,44 @@ def evaluate(eval_iter):
 
 
 def train():
+    """    return None
+    Trains the model on the given dataset, using the specified training parameters.
+    Parameters:
+        - model (nn.Module): The model to be trained.
+        - optimizer (torch.optim): The optimizer used for training.
+        - tr_iter (DataIterator): The training data iterator.
+        - va_iter (DataIterator): The validation data iterator.
+        - args (argparse.Namespace): The training arguments.
+        - writer (SummaryWriter): The TensorBoard writer for logging.
+        - epoch (int): The current epoch number.
+    Returns:
+        - None
+    Processing Logic:
+        - Sets the model to training mode.
+        - Resets the model's length according to the target length and memory length specified in the arguments.
+        - Gets the variable length iterator if specified in the arguments.
+        - Initializes the memory for each batch chunk if the batch chunk size is greater than 1.
+        - Loops through each batch in the training iterator.
+        - If the current training step is less than the start training step specified in the arguments, the step is incremented and the loop continues.
+        - Otherwise, the model's gradients are set to zero.
+        - Generates a random number between 0 and 1 and checks if it is less than the Jacobian loss frequency specified in the arguments.
+        - Sets the forward and backward threshold values according to the arguments.
+        - If the batch chunk size is greater than 1, the data and target are split into chunks and the model is trained on each chunk separately.
+        - Otherwise, the model is trained on the entire batch.
+        - The loss and Jacobian loss are calculated and the model's memory is updated.
+        - The loss is divided by the batch chunk size if applicable.
+        - The gradients are calculated and the loss is backpropagated.
+        - The train loss and Jacobian loss are updated.
+        - The model's parameters are clipped to prevent exploding gradients.
+        - The learning rate is updated according to the specified scheduler.
+        - If the current training step is a multiple of the log interval specified in the arguments, the training progress is logged.
+        - The model is evaluated on the validation data if the current training step is a multiple of the evaluation interval specified in the arguments.
+        - The model is saved if the validation loss is the best seen so far.
+        - The learning rate is updated according to the specified scheduler if applicable.
+        - If the current training step is equal to the pretrain steps specified in the arguments, the model is saved and the CUDA cache is emptied.
+        - If the current training step is equal to the maximum step specified in the arguments, the loop is broken.
+        - If the current training step is greater than the pretrain steps specified in the arguments and the Jacobian loss weight and frequency are greater than 0 and the incremental value is greater than 0 and the current training step is a multiple of the incremental value, the Jacobian loss weight is incremented by 0.1."""
+    
     global train_step, train_loss, train_jac_loss, best_val_loss, eval_start_time, log_start_time
     model.train()
     model.reset_length(args.tgt_len, args.mem_len)
