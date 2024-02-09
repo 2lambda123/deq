@@ -5,11 +5,11 @@ import math
 import os, sys
 import itertools
 import numpy as np
-import random
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import secrets
 
 sys.path.append('../')
 
@@ -450,7 +450,7 @@ def train():
 
         # For DEQ:
         compute_jac_loss = np.random.uniform(0,1) < args.jac_loss_freq
-        f_thres = args.f_thres + (random.randint(-args.rand_f_thres_delta,0) if args.rand_f_thres_delta > 0 else 0)
+        f_thres = args.f_thres + (secrets.SystemRandom().randint(-args.rand_f_thres_delta,0) if args.rand_f_thres_delta > 0 else 0)
         b_thres = args.b_thres
 
         if args.batch_chunk > 1:
